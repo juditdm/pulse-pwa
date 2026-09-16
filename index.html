@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f5f4f0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Pulse">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="styles.css">
+
+    <title>Pulse Training</title>
+</head>
+<body>
+    <main class="app-shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">TRAINING LOG</p>
+                <h1>Pulse</h1>
+            </div>
+            <button class="icon-button" id="menu-button" type="button" aria-label="Abrir menú">⋯</button>
+        </header>
+
+        <section class="hero-card">
+            <div>
+                <p class="muted">Tu entrenamiento</p>
+                <h2>Registra el progreso<br>una serie cada vez.</h2>
+            </div>
+            <div class="hero-symbol">✦</div>
+        </section>
+
+        <section id="summary-view" class="view active-view">
+            <section class="stats-grid">
+                <div class="stat-card"><span class="stat-number" id="total-sessions">0</span><span class="muted">sesiones</span></div>
+                <div class="stat-card"><span class="stat-number" id="total-minutes">0</span><span class="muted">minutos totales</span></div>
+                <div class="stat-card"><span class="stat-number" id="total-sets">0</span><span class="muted">sets realizados</span></div>
+                <div class="stat-card"><span class="stat-number" id="total-volume">0</span><span class="muted">kg de volumen</span></div>
+            </section>
+
+            <section class="section-heading">
+                <div>
+                    <p class="eyebrow">HISTORIAL</p>
+                    <h2>Entrenamientos recientes</h2>
+                </div>
+            </section>
+
+            <div id="workout-list"></div>
+        </section>
+
+        <section id="progress-view" class="view hidden-view">
+            <section class="section-heading">
+                <div>
+                    <p class="eyebrow">ANÁLISIS</p>
+                    <h2>Tu progreso</h2>
+                </div>
+            </section>
+            <div class="progress-card">
+                <p class="eyebrow">EJERCICIOS</p>
+                <div id="exercise-summary"></div>
+            </div>
+        </section>
+
+        <section id="profile-view" class="view hidden-view">
+            <section class="section-heading">
+                <div>
+                    <p class="eyebrow">PERSONAL</p>
+                    <h2>Perfil</h2>
+                </div>
+            </section>
+            <div class="profile-card">
+                <div class="avatar">PT</div>
+                <h3>Tu perfil de entrenamiento</h3>
+                <p class="muted">Tus datos se guardan en este dispositivo.</p>
+            </div>
+            <div class="profile-actions">
+                <button class="secondary-button" id="export-button" type="button">Exportar copia de seguridad</button>
+                <label class="secondary-button file-button">
+                    Importar copia de seguridad
+                    <input id="import-input" type="file" accept="application/json">
+                </label>
+            </div>
+        </section>
+
+        <section id="new-workout-view" class="view hidden-view">
+            <section class="section-heading">
+                <div>
+                    <p class="eyebrow">NUEVO REGISTRO</p>
+                    <h2>Crear sesión</h2>
+                </div>
+                <button id="close-workout-button" class="text-button" type="button">Cerrar</button>
+            </section>
+
+            <form id="workout-form" class="workout-form">
+                <label>Día<input id="workout-date" type="date" required></label>
+                <label>Duración, minutos<input id="workout-duration" type="number" min="1" placeholder="60" required></label>
+                <label>Tipo de entrenamiento<select id="workout-type" required><option value="">Selecciona una opción</option><option>Tren superior</option><option>Tren inferior</option><option>Core</option></select></label>
+                <div id="exercise-list"></div>
+                <button id="add-exercise-button" class="secondary-button" type="button">+ Añadir ejercicio</button>
+                <button class="primary-button" type="submit">Guardar sesión</button>
+            </form>
+        </section>
+
+        <button class="primary-button" id="new-workout-button" type="button">+ Nueva sesión</button>
+
+        <nav class="bottom-nav">
+            <button class="nav-button active" data-view="summary-view" type="button">Resumen</button>
+            <button class="nav-button" data-view="progress-view" type="button">Progreso</button>
+            <button class="nav-button" data-view="profile-view" type="button">Perfil</button>
+        </nav>
+    </main>
+
+    <template id="exercise-template">
+        <div class="exercise-form-card">
+            <div class="exercise-form-header">
+                <label>Ejercicio<input class="exercise-name" type="text" placeholder="Ej. Press banca" required></label>
+                <button class="remove-exercise-button" type="button">Eliminar</button>
+            </div>
+            <div class="set-inputs">
+                <label>Set<input class="set-number-input" type="number" min="1" required></label>
+                <label>Reps<input class="reps-input" type="number" min="1" placeholder="10" required></label>
+                <label>Peso kg<input class="weight-input" type="number" min="0" step="0.5" placeholder="40" required></label>
+            </div>
+            <button class="add-set-button" type="button">+ Añadir set</button>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+</html>

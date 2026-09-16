@@ -1,0 +1,6 @@
+.env
+.env.*
+.venv/
+entrenamientos.db
+__pycache__/
+*.pyc

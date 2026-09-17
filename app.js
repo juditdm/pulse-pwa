@@ -44,10 +44,18 @@ const exerciseDetailTitle = document.querySelector("#exercise-detail-title");
 const exerciseDetailRecord = document.querySelector("#exercise-detail-record");
 const exerciseDetailHistory = document.querySelector("#exercise-detail-history");
 const closeExerciseDetail = document.querySelector("#close-exercise-detail");
+const workoutListContainer = document.querySelector("#workout-list");
+const duplicateWorkoutPanel = document.querySelector("#duplicate-workout-panel");
+const duplicateWorkoutForm = document.querySelector("#duplicate-workout-form");
+const duplicateWorkoutDate = document.querySelector("#duplicate-workout-date");
+const duplicateWorkoutDuration = document.querySelector("#duplicate-workout-duration");
+const duplicateWorkoutExercises = document.querySelector("#duplicate-workout-exercises");
+const cancelDuplicateWorkout = document.querySelector("#cancel-duplicate-workout");
 
 let workouts = [];
 let activeWorkout = null;
 let pendingTemplate = null;
+let pendingDuplicate = null;
 let databasePromise = openDatabase();
 let saveSequence = Promise.resolve();
 
@@ -448,18 +456,60 @@ function render() {
 }
 
 function renderWorkouts() {
-    const container = document.querySelector("#workout-list");
-    if (!workouts.length) { container.innerHTML = `<div class="empty-state">Todavía no hay entrenamientos registrados.</div>`; return; }
+    if (!workouts.length) { workoutListContainer.innerHTML = `<div class="empty-state">Todavía no hay entrenamientos registrados.</div>`; return; }
     const groups = {};
     workouts.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach((workout) => { const key = workout.date.slice(0, 7); if (!groups[key]) groups[key] = []; groups[key].push(workout); });
-    container.innerHTML = Object.entries(groups).map(([monthKey, monthWorkouts]) => {
+    workoutListContainer.innerHTML = Object.entries(groups).map(([monthKey, monthWorkouts]) => {
         const cards = monthWorkouts.map((workout) => {
             const exercisesHtml = workout.exercises.map((exercise) => `<div class="exercise-block"><div class="exercise-title"><span>${escapeHtml(exercise.name)}</span><span class="set-count">${exercise.sets.length} sets</span></div>${exercise.sets.map((set) => `<div class="set-card"><div class="set-card-main"><span class="set-badge">Set ${set.number}</span><div><small>REPS</small><strong>${set.reps}</strong></div><div><small>PESO</small><strong>${set.weight} kg</strong></div></div></div>`).join("")}${exercise.notes ? `<p class="exercise-note">${escapeHtml(exercise.notes)}</p>` : ""}</div>`).join("");
-            return `<article class="workout-card"><div class="workout-header"><div><span class="date-label">${workout.date}</span><h3>${escapeHtml(workout.type)}</h3></div><span class="duration-pill">${workout.duration} min</span></div>${exercisesHtml}</article>`;
+            return `<article class="workout-card" data-workout-id="${workout.id}"><div class="workout-header"><div><span class="date-label">${workout.date}</span><h3>${escapeHtml(workout.type)}</h3></div><span class="duration-pill">${workout.duration} min</span></div>${exercisesHtml}<button class="duplicate-session-button" data-action="duplicate-workout" type="button">Repetir esta sesión</button></article>`;
         }).join("");
         return `<section class="month-section"><div class="month-heading"><h3>${formatMonth(`${monthKey}-01`)}</h3><span>${monthWorkouts.length} ${monthWorkouts.length === 1 ? "sesión" : "sesiones"}</span></div>${cards}</section>`;
     }).join("");
 }
+
+workoutListContainer.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action='duplicate-workout']");
+    if (!button) return;
+    const card = event.target.closest("[data-workout-id]");
+    const workout = workouts.find((item) => item.id === card.dataset.workoutId);
+    if (workout) openDuplicatePanel(workout);
+});
+
+function openDuplicatePanel(workout) {
+    pendingDuplicate = workout;
+    duplicateWorkoutDate.value = today();
+    duplicateWorkoutDuration.value = workout.duration || "";
+    duplicateWorkoutExercises.innerHTML = workout.exercises.map((exercise) => `<div class="duplicate-exercise-item">${escapeHtml(exercise.name)} · ${exercise.sets.length} sets</div>`).join("");
+    openPanel(duplicateWorkoutPanel);
+}
+
+duplicateWorkoutForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!pendingDuplicate) return;
+
+    activeWorkout = {
+        id: createId(),
+        date: duplicateWorkoutDate.value,
+        duration: Number(duplicateWorkoutDuration.value),
+        type: pendingDuplicate.type,
+        exercises: pendingDuplicate.exercises.map((exercise) => ({
+            id: createId(),
+            name: exercise.name,
+            notes: "",
+            sets: exercise.sets.map((set, index) => ({ id: createId(), number: index + 1, reps: 0, weight: 0, completed: false }))
+        }))
+    };
+
+    pendingDuplicate = null;
+    persistActiveWorkout();
+    renderActiveWorkout();
+    closePanel(duplicateWorkoutPanel);
+    showView("active-workout-view");
+});
+
+cancelDuplicateWorkout.addEventListener("click", () => { pendingDuplicate = null; closePanel(duplicateWorkoutPanel); });
+duplicateWorkoutPanel.addEventListener("click", (event) => { if (event.target === duplicateWorkoutPanel) { pendingDuplicate = null; closePanel(duplicateWorkoutPanel); } });
 
 function renderProgress() {
     const consistency = calculateConsistency();
@@ -641,7 +691,7 @@ async function finishWorkout() {
 /* ---------- COPIAS DE SEGURIDAD ---------- */
 
 function exportBackup() {
-    const backup = { version: "6", workouts, favorites: getFavorites(), templates: getTemplates() };
+    const backup = { version: "7", workouts, favorites: getFavorites(), templates: getTemplates() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");

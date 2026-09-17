@@ -26,7 +26,6 @@
 
         <section id="progress-view" class="view hidden-view">
             <section class="section-heading"><div><p class="eyebrow">ANÁLISIS</p><h2>Tu progreso</h2></div></section>
-
             <div class="progress-card premium-surface">
                 <p class="eyebrow">CONSTANCIA</p>
                 <div class="consistency-grid">
@@ -36,7 +35,6 @@
                 </div>
                 <div id="type-breakdown" class="type-breakdown"></div>
             </div>
-
             <div class="progress-highlight premium-surface">
                 <p class="eyebrow">MEJORES MARCAS</p>
                 <h3>Récords por ejercicio</h3>
@@ -126,6 +124,20 @@
                 <p class="muted">Selecciona la plantilla que quieres utilizar.</p>
                 <div id="select-template-list"></div>
                 <button id="cancel-select-template" class="secondary-button" type="button">Cancelar</button>
+            </div>
+        </section>
+
+        <section id="duplicate-workout-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
+                <p class="eyebrow">REPETIR SESIÓN</p>
+                <h2>Nueva sesión desde una anterior</h2>
+                <p class="muted">Vamos a copiar los ejercicios de esta sesión con los sets vacíos.</p>
+                <form id="duplicate-workout-form">
+                    <label>Día<input id="duplicate-workout-date" type="date" required></label>
+                    <label>Duración estimada, minutos<input id="duplicate-workout-duration" type="number" min="1" placeholder="60" required></label>
+                    <div id="duplicate-workout-exercises" class="duplicate-exercise-list"></div>
+                    <div class="dialog-actions"><button id="cancel-duplicate-workout" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Crear sesión</button></div>
+                </form>
             </div>
         </section>
 

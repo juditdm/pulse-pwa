@@ -15,146 +15,104 @@
 <body>
     <main class="app-shell">
         <header class="topbar">
-            <div>
-                <p class="eyebrow">TRAINING LOG</p>
-                <h1>Pulse</h1>
-            </div>
-            <div class="connection-status" id="connection-status">Local</div>
+            <div><p class="eyebrow">TRAINING LOG</p><h1>Pulse</h1></div>
+            <div id="connection-status" class="connection-status">Local</div>
         </header>
 
         <section id="summary-view" class="view active-view">
-            <section class="summary-header premium-surface">
-                <div>
-                    <p class="eyebrow">TU HISTORIAL</p>
-                    <h2>Entrenamientos</h2>
-                    <p class="muted">Tu progreso, sesión a sesión.</p>
-                </div>
-                <div class="summary-count">
-                    <strong id="total-sessions">0</strong>
-                    <span>sesiones</span>
-                </div>
-            </section>
+            <section class="summary-header premium-surface"><div><p class="eyebrow">TU HISTORIAL</p><h2>Entrenamientos</h2><p class="muted">Tu progreso, sesión a sesión.</p></div><div class="summary-count"><strong id="total-sessions">0</strong><span>sesiones</span></div></section>
             <div id="workout-list"></div>
         </section>
 
         <section id="progress-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">ANÁLISIS</p>
-                    <h2>Tu progreso</h2>
-                </div>
-            </section>
-            <div class="progress-highlight premium-surface">
-                <p class="eyebrow">MEJORES MARCAS</p>
-                <h3>Tu peso máximo por ejercicio</h3>
-                <p class="muted">La evolución que puedes aplicar en la próxima sesión.</p>
+            <section class="section-heading"><div><p class="eyebrow">ANÁLISIS</p><h2>Tu progreso</h2></div></section>
+            <div class="progress-highlight premium-surface"><p class="eyebrow">MEJORES MARCAS</p><h3>Tu peso máximo por ejercicio</h3><p class="muted">La evolución que puedes aplicar en la próxima sesión.</p></div>
+            <div class="progress-card premium-surface"><div id="exercise-summary"></div></div>
+            <div class="progress-card premium-surface"><p class="eyebrow">CONSTANCIA</p><div class="consistency-grid"><div><strong id="progress-sessions">0</strong><span>sesiones</span></div><div><strong id="progress-minutes">0</strong><span>minutos</span></div><div><strong id="progress-types">0</strong><span>tipos usados</span></div></div></div>
+        </section>
+
+        <section id="library-view" class="view hidden-view">
+            <section class="section-heading"><div><p class="eyebrow">ORGANIZACIÓN</p><h2>Ejercicios</h2></div></section>
+            <div class="library-card premium-surface">
+                <div class="library-heading"><div><p class="eyebrow">BIBLIOTECA</p><h3>Todos mis ejercicios</h3><p class="muted library-description">Ejercicios detectados en tus sesiones.</p></div><span id="exercise-count" class="set-count">0</span></div>
+                <div id="all-exercise-list"></div>
             </div>
-            <div class="progress-card premium-surface">
-                <div id="exercise-summary"></div>
+            <div class="library-card premium-surface">
+                <div class="library-heading"><div><p class="eyebrow">FAVORITOS</p><h3>Mis ejercicios favoritos</h3></div><span id="favorite-count" class="set-count">0</span></div>
+                <div id="favorite-list"></div>
             </div>
-            <div class="progress-card premium-surface">
-                <p class="eyebrow">CONSTANCIA</p>
-                <div class="consistency-grid">
-                    <div><strong id="progress-sessions">0</strong><span>sesiones</span></div>
-                    <div><strong id="progress-minutes">0</strong><span>minutos</span></div>
-                    <div><strong id="progress-types">0</strong><span>tipos usados</span></div>
-                </div>
+            <div class="library-card premium-surface">
+                <div class="library-heading"><div><p class="eyebrow">PLANTILLAS</p><h3>Mis entrenamientos</h3></div><button id="new-template-button" class="small-action" type="button">+ Crear</button></div>
+                <div id="template-list"></div>
             </div>
         </section>
 
         <section id="profile-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">PERSONAL</p>
-                    <h2>Perfil</h2>
-                </div>
-            </section>
-            <div class="profile-card premium-surface">
-                <div class="avatar">PT</div>
-                <h3>Tu perfil de entrenamiento</h3>
-                <p class="muted">Tus sesiones se guardan localmente en este dispositivo.</p>
-            </div>
-            <div class="profile-actions">
-                <button class="secondary-button" id="export-button" type="button">Exportar copia de seguridad</button>
-                <label class="secondary-button file-button">
-                    Importar copia de seguridad
-                    <input id="import-input" type="file" accept="application/json">
-                </label>
-            </div>
+            <section class="section-heading"><div><p class="eyebrow">PERSONAL</p><h2>Perfil</h2></div></section>
+            <div class="profile-card premium-surface"><div class="avatar">PT</div><h3>Tu perfil de entrenamiento</h3><p class="muted">Tus sesiones, favoritos y plantillas se guardan localmente.</p></div>
+            <div class="profile-actions"><button id="export-button" class="secondary-button" type="button">Exportar copia de seguridad</button><label class="secondary-button file-button">Importar copia de seguridad<input id="import-input" type="file" accept="application/json"></label></div>
         </section>
 
         <section id="new-workout-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">NUEVO REGISTRO</p>
-                    <h2>Iniciar sesión</h2>
-                </div>
-                <button id="close-workout-button" class="text-button" type="button">Cerrar</button>
-            </section>
-
+            <section class="section-heading"><div><p class="eyebrow">NUEVO REGISTRO</p><h2>Iniciar sesión</h2></div><button id="close-workout-button" class="text-button" type="button">Cerrar</button></section>
+            <div class="start-options"><button id="start-empty-workout-button" class="secondary-button" type="button">Sesión vacía</button><button id="choose-template-button" class="secondary-button" type="button">Usar plantilla</button></div>
             <form id="workout-form" class="workout-form premium-surface">
-                <label>
-                    Día
-                    <input id="workout-date" type="date" required>
-                </label>
-                <label>
-                    Duración estimada, minutos
-                    <input id="workout-duration" type="number" min="1" placeholder="60" required>
-                </label>
-                <label>
-                    Tipo de entrenamiento
-                    <select id="workout-type" required>
-                        <option value="">Selecciona una opción</option>
-                        <option>Tren superior</option>
-                        <option>Tren inferior</option>
-                        <option>Core</option>
-                    </select>
-                </label>
-                <button class="primary-button" type="submit">Iniciar entrenamiento</button>
+                <label>Día<input id="workout-date" type="date" required></label>
+                <label>Duración estimada, minutos<input id="workout-duration" type="number" min="1" placeholder="60" required></label>
+                <label>Tipo de entrenamiento<select id="workout-type" required><option value="">Selecciona una opción</option><option>Tren superior</option><option>Tren inferior</option><option>Core</option></select></label>
+                <button class="primary-button" type="submit">Continuar</button>
             </form>
         </section>
 
         <section id="active-workout-view" class="view hidden-view">
-            <section class="active-header premium-surface">
-                <div>
-                    <p class="eyebrow">SESIÓN ACTIVA</p>
-                    <h2 id="active-workout-title">Entrenamiento</h2>
-                    <span class="muted" id="active-workout-meta"></span>
-                    <span class="save-status" id="active-save-status">Guardado local</span>
-                </div>
-                <button id="finish-workout-button" class="text-button" type="button">Finalizar</button>
-            </section>
-
+            <section class="active-header premium-surface"><div><p class="eyebrow">SESIÓN ACTIVA</p><h2 id="active-workout-title">Entrenamiento</h2><span id="active-workout-meta" class="muted"></span><span id="active-save-status" class="save-status">Guardado local</span></div><button id="finish-workout-button" class="text-button" type="button">Finalizar</button></section>
             <div id="active-exercise-list"></div>
-
             <button id="add-active-exercise-button" class="secondary-button" type="button">+ Añadir ejercicio</button>
         </section>
 
-        <dialog id="exercise-dialog" class="exercise-dialog">
-            <form id="exercise-form" method="dialog" class="exercise-dialog-card">
+        <section id="add-exercise-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
                 <p class="eyebrow">NUEVO EJERCICIO</p>
                 <h2>Añadir ejercicio</h2>
-                <p class="muted">Escribe el nombre para poder registrarlo.</p>
-                <label>
-                    Nombre del ejercicio
-                    <input id="exercise-name-input" type="text" autocomplete="off" placeholder="Ejemplo: Press banca" required>
-                </label>
-                <div class="dialog-actions">
-                    <button id="cancel-exercise-button" class="secondary-button" type="button">Cancelar</button>
-                    <button class="primary-button" type="submit">Añadir ejercicio</button>
-                </div>
-            </form>
-        </dialog>
+                <p class="muted">Escribe el nombre del ejercicio.</p>
+                <form id="add-exercise-form">
+                    <label>Nombre del ejercicio<input id="add-exercise-name" type="text" autocomplete="off" placeholder="Ejemplo: Press banca" required></label>
+                    <div class="dialog-actions"><button id="cancel-add-exercise" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Añadir ejercicio</button></div>
+                </form>
+            </div>
+        </section>
 
-        <button class="primary-button floating-action" id="new-workout-button" type="button">+ Nueva sesión</button>
+        <section id="template-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
+                <p class="eyebrow">NUEVA PLANTILLA</p>
+                <h2>Crear plantilla</h2>
+                <p class="muted">Escribe un nombre y selecciona ejercicios.</p>
+                <form id="template-form">
+                    <label>Nombre de la plantilla<input id="template-name-input" type="text" autocomplete="off" placeholder="Ejemplo: Tren superior A" required></label>
+                    <div id="template-exercise-options" class="template-exercise-options"></div>
+                    <div class="dialog-actions"><button id="cancel-template-button" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Guardar plantilla</button></div>
+                </form>
+            </div>
+        </section>
 
+        <section id="select-template-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
+                <p class="eyebrow">PLANTILLAS</p>
+                <h2>Elegir plantilla</h2>
+                <p class="muted">Selecciona la plantilla que quieres utilizar.</p>
+                <div id="select-template-list"></div>
+                <button id="cancel-select-template" class="secondary-button" type="button">Cancelar</button>
+            </div>
+        </section>
+
+        <button id="new-workout-button" class="primary-button floating-action" type="button">+ Nueva sesión</button>
         <nav class="bottom-nav">
             <button class="nav-button active" data-view="summary-view" type="button">Resumen</button>
             <button class="nav-button" data-view="progress-view" type="button">Progreso</button>
+            <button class="nav-button" data-view="library-view" type="button">Ejercicios</button>
             <button class="nav-button" data-view="profile-view" type="button">Perfil</button>
         </nav>
     </main>
-
     <script src="app.js"></script>
 </body>
 </html>

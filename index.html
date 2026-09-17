@@ -26,9 +26,33 @@
 
         <section id="progress-view" class="view hidden-view">
             <section class="section-heading"><div><p class="eyebrow">ANÁLISIS</p><h2>Tu progreso</h2></div></section>
-            <div class="progress-highlight premium-surface"><p class="eyebrow">MEJORES MARCAS</p><h3>Tu peso máximo por ejercicio</h3><p class="muted">La evolución que puedes aplicar en la próxima sesión.</p></div>
+
+            <div class="progress-card premium-surface">
+                <p class="eyebrow">CONSTANCIA</p>
+                <div class="consistency-grid">
+                    <div><strong id="streak-weeks">0</strong><span>semanas seguidas</span></div>
+                    <div><strong id="month-sessions">0</strong><span>sesiones este mes</span></div>
+                    <div><strong id="month-diff">0</strong><span>vs. mes anterior</span></div>
+                </div>
+                <div id="type-breakdown" class="type-breakdown"></div>
+            </div>
+
+            <div class="progress-highlight premium-surface">
+                <p class="eyebrow">MEJORES MARCAS</p>
+                <h3>Récords por ejercicio</h3>
+                <p class="muted">Pulsa un ejercicio para ver su evolución completa.</p>
+            </div>
             <div class="progress-card premium-surface"><div id="exercise-summary"></div></div>
-            <div class="progress-card premium-surface"><p class="eyebrow">CONSTANCIA</p><div class="consistency-grid"><div><strong id="progress-sessions">0</strong><span>sesiones</span></div><div><strong id="progress-minutes">0</strong><span>minutos</span></div><div><strong id="progress-types">0</strong><span>tipos usados</span></div></div></div>
+        </section>
+
+        <section id="exercise-detail-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
+                <p class="eyebrow">HISTORIAL</p>
+                <h2 id="exercise-detail-title">Ejercicio</h2>
+                <div id="exercise-detail-record" class="exercise-detail-record"></div>
+                <div id="exercise-detail-history" class="exercise-detail-history"></div>
+                <button id="close-exercise-detail" class="secondary-button" type="button">Cerrar</button>
+            </div>
         </section>
 
         <section id="library-view" class="view hidden-view">

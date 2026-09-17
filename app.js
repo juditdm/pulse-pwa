@@ -38,6 +38,12 @@ const chooseTemplateButton = document.querySelector("#choose-template-button");
 const allExerciseList = document.querySelector("#all-exercise-list");
 const favoriteListContainer = document.querySelector("#favorite-list");
 const templateListContainer = document.querySelector("#template-list");
+const exerciseSummaryContainer = document.querySelector("#exercise-summary");
+const exerciseDetailPanel = document.querySelector("#exercise-detail-panel");
+const exerciseDetailTitle = document.querySelector("#exercise-detail-title");
+const exerciseDetailRecord = document.querySelector("#exercise-detail-record");
+const exerciseDetailHistory = document.querySelector("#exercise-detail-history");
+const closeExerciseDetail = document.querySelector("#close-exercise-detail");
 
 let workouts = [];
 let activeWorkout = null;
@@ -201,6 +207,19 @@ function formatMonth(dateString) {
     return new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(new Date(Number(year), Number(month) - 1, 1));
 }
 
+function formatDateShort(dateString) {
+    return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(`${dateString}T00:00:00`));
+}
+
+function getIsoWeekKey(dateString) {
+    const date = new Date(`${dateString}T00:00:00`);
+    const day = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - day + 3);
+    const firstThursday = new Date(date.getFullYear(), 0, 4);
+    const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getDay() + 6) % 7)) / 7);
+    return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
 function showView(viewId) {
     views.forEach((view) => {
         view.classList.toggle("hidden-view", view.id !== viewId);
@@ -237,7 +256,7 @@ function escapeHtml(value) {
     return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-/* ---------- SESIÓN ACTIVA (delegación de eventos en el contenedor) ---------- */
+/* ---------- SESIÓN ACTIVA ---------- */
 
 function renderActiveWorkout() {
     if (!activeWorkout) return;
@@ -355,7 +374,7 @@ activeExerciseList.addEventListener("input", async (event) => {
     await persistActiveWorkout();
 });
 
-/* ---------- ESTADÍSTICAS Y RESUMEN ---------- */
+/* ---------- ESTADÍSTICAS, RÉCORDS Y CONSTANCIA ---------- */
 
 function calculateStats() {
     return { sessions: workouts.length, minutes: workouts.reduce((total, workout) => total + workout.duration, 0), types: new Set(workouts.map((workout) => workout.type)).size };
@@ -366,21 +385,65 @@ function calculateExerciseSummary() {
     workouts.forEach((workout) => workout.exercises.forEach((exercise) => {
         const name = exercise.name.trim();
         if (!name || name === "Nuevo ejercicio") return;
-        if (!summary[name]) summary[name] = { name, sessions: 0, sets: 0, maxWeight: 0 };
+        if (!summary[name]) summary[name] = { name, sessions: 0, sets: 0, maxWeight: 0, recordDate: "", lastDate: "", lastWeight: 0, lastReps: 0, history: [] };
         summary[name].sessions += 1;
-        exercise.sets.forEach((set) => { summary[name].sets += 1; summary[name].maxWeight = Math.max(summary[name].maxWeight, set.weight); });
+        summary[name].lastDate = workout.date > summary[name].lastDate ? workout.date : summary[name].lastDate;
+
+        exercise.sets.forEach((set) => {
+            summary[name].sets += 1;
+            summary[name].history.push({ date: workout.date, weight: set.weight, reps: set.reps });
+            if (set.weight >= summary[name].maxWeight) {
+                summary[name].maxWeight = set.weight;
+                summary[name].recordDate = workout.date;
+            }
+        });
     }));
+
+    Object.values(summary).forEach((exercise) => {
+        const lastSets = exercise.history.filter((item) => item.date === exercise.lastDate);
+        if (lastSets.length) {
+            const best = lastSets.reduce((max, item) => (item.weight > max.weight ? item : max), lastSets[0]);
+            exercise.lastWeight = best.weight;
+            exercise.lastReps = best.reps;
+        }
+    });
+
     return Object.values(summary).sort((a, b) => b.maxWeight - a.maxWeight || a.name.localeCompare(b.name));
+}
+
+function calculateConsistency() {
+    const now = new Date();
+    const currentMonthKey = today().slice(0, 7);
+    const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthKey = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+    const monthSessions = workouts.filter((workout) => workout.date.slice(0, 7) === currentMonthKey).length;
+    const previousMonthSessions = workouts.filter((workout) => workout.date.slice(0, 7) === previousMonthKey).length;
+
+    const weeksWithSessions = new Set(workouts.map((workout) => getIsoWeekKey(workout.date)));
+    let streak = 0;
+    const cursor = new Date();
+    while (true) {
+        const key = getIsoWeekKey(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`);
+        if (weeksWithSessions.has(key)) {
+            streak += 1;
+            cursor.setDate(cursor.getDate() - 7);
+        } else {
+            break;
+        }
+    }
+
+    const typeCounts = {};
+    workouts.forEach((workout) => { typeCounts[workout.type] = (typeCounts[workout.type] || 0) + 1; });
+
+    return { monthSessions, previousMonthSessions, streak, typeCounts };
 }
 
 function render() {
     const stats = calculateStats();
     document.querySelector("#total-sessions").textContent = stats.sessions;
-    document.querySelector("#progress-sessions").textContent = stats.sessions;
-    document.querySelector("#progress-minutes").textContent = stats.minutes;
-    document.querySelector("#progress-types").textContent = stats.types;
     renderWorkouts();
-    renderExerciseSummary();
+    renderProgress();
     renderLibrary();
 }
 
@@ -398,13 +461,73 @@ function renderWorkouts() {
     }).join("");
 }
 
-function renderExerciseSummary() {
-    const container = document.querySelector("#exercise-summary");
-    const summary = calculateExerciseSummary();
-    container.innerHTML = summary.length ? summary.map((exercise) => `<div class="exercise-summary-row"><div><strong>${escapeHtml(exercise.name)}</strong><span>${exercise.sessions} sesiones · ${exercise.sets} sets</span></div><div class="exercise-summary-value"><strong>${exercise.maxWeight} kg</strong><span>máximo</span></div></div>`).join("") : `<p class="muted">Todavía no hay ejercicios.</p>`;
+function renderProgress() {
+    const consistency = calculateConsistency();
+    document.querySelector("#streak-weeks").textContent = consistency.streak;
+    document.querySelector("#month-sessions").textContent = consistency.monthSessions;
+
+    const diff = consistency.monthSessions - consistency.previousMonthSessions;
+    const diffLabel = diff > 0 ? `+${diff}` : String(diff);
+    document.querySelector("#month-diff").textContent = diffLabel;
+
+    const typeContainer = document.querySelector("#type-breakdown");
+    const typeEntries = Object.entries(consistency.typeCounts).sort((a, b) => b[1] - a[1]);
+    typeContainer.innerHTML = typeEntries.length ? typeEntries.map(([type, count]) => `<div class="type-breakdown-row"><span>${escapeHtml(type)}</span><span>${count} ${count === 1 ? "sesión" : "sesiones"}</span></div>`).join("") : `<p class="muted">Todavía no hay sesiones para repartir por tipo.</p>`;
+
+    renderExerciseSummary();
 }
 
-/* ---------- BIBLIOTECA, FAVORITOS Y PLANTILLAS (delegación de eventos) ---------- */
+function renderExerciseSummary() {
+    const summary = calculateExerciseSummary();
+    if (!summary.length) { exerciseSummaryContainer.innerHTML = `<p class="muted">Todavía no hay ejercicios registrados.</p>`; return; }
+
+    exerciseSummaryContainer.innerHTML = summary.map((exercise) => {
+        const isRecord = exercise.lastWeight >= exercise.maxWeight;
+        const diff = exercise.lastWeight - exercise.maxWeight;
+        const diffLabel = isRecord ? "Es tu récord actual" : `${diff.toFixed(1)} kg respecto al récord`;
+        const diffClass = isRecord ? "positive" : "neutral";
+        return `
+            <div class="exercise-summary-row" data-exercise-name="${escapeHtml(exercise.name)}">
+                <div>
+                    <strong>${escapeHtml(exercise.name)}</strong>
+                    <span>${exercise.sessions} sesiones · Récord el ${formatDateShort(exercise.recordDate)}</span>
+                </div>
+                <div class="exercise-summary-value">
+                    <strong>${exercise.maxWeight} kg</strong>
+                    <span class="progress-diff ${diffClass}">${diffLabel}</span>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+exerciseSummaryContainer.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-exercise-name]");
+    if (!row) return;
+    openExerciseDetail(row.dataset.exerciseName);
+});
+
+function openExerciseDetail(name) {
+    const summary = calculateExerciseSummary().find((exercise) => exercise.name === name);
+    if (!summary) return;
+
+    exerciseDetailTitle.textContent = summary.name;
+    exerciseDetailRecord.innerHTML = `
+        <div><strong>${summary.maxWeight} kg</strong><span>RÉCORD PERSONAL</span></div>
+        <div><strong>${formatDateShort(summary.recordDate)}</strong><span>FECHA DEL RÉCORD</span></div>
+        <div><strong>${summary.lastWeight} kg × ${summary.lastReps}</strong><span>ÚLTIMA SESIÓN</span></div>
+    `;
+
+    const history = summary.history.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
+    exerciseDetailHistory.innerHTML = history.map((item) => `<div class="exercise-detail-row"><span>${formatDateShort(item.date)}</span><strong>${item.reps} reps · ${item.weight} kg</strong></div>`).join("");
+
+    openPanel(exerciseDetailPanel);
+}
+
+closeExerciseDetail.addEventListener("click", () => closePanel(exerciseDetailPanel));
+exerciseDetailPanel.addEventListener("click", (event) => { if (event.target === exerciseDetailPanel) closePanel(exerciseDetailPanel); });
+
+/* ---------- BIBLIOTECA, FAVORITOS Y PLANTILLAS ---------- */
 
 function renderLibrary() {
     const names = getAllExerciseNames();
@@ -518,7 +641,7 @@ async function finishWorkout() {
 /* ---------- COPIAS DE SEGURIDAD ---------- */
 
 function exportBackup() {
-    const backup = { version: "5.4", workouts, favorites: getFavorites(), templates: getTemplates() };
+    const backup = { version: "6", workouts, favorites: getFavorites(), templates: getTemplates() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
@@ -546,7 +669,7 @@ function importBackup(event) {
     reader.readAsText(file);
 }
 
-/* ---------- LISTENERS FIJOS (elementos que nunca se destruyen) ---------- */
+/* ---------- LISTENERS FIJOS ---------- */
 
 navButtons.forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
 newWorkoutButton.addEventListener("click", () => { pendingTemplate = null; prepareWorkoutForm(); showView("new-workout-view"); });

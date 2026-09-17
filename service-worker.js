@@ -1,4 +1,4 @@
-const CACHE_NAME = "pulse-static-v3";
+const CACHE_NAME = "pulse-static-v4.4";
 
 const FILES_TO_CACHE = [
     "./",

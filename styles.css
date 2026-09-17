@@ -138,3 +138,5 @@ h3 { margin-bottom:0; font-size:19px; }
 .duplicate-session-button { margin-top:14px; padding:10px 12px; border:0; border-radius:11px; background:#edf5ee; color:var(--dark-green); font-size:12px; font-weight:800; }
 .duplicate-exercise-list { display:grid; gap:8px; max-height:220px; margin:15px 0; overflow:auto; }
 .duplicate-exercise-item { padding:11px; border:1px solid var(--border); border-radius:11px; background:#fbfcfa; font-size:13px; font-weight:700; }
+.exercise-count-badge { display:inline-block; margin:-38px 0 16px; }
+.custom-exercise-tag { padding:6px 8px; border-radius:8px; background:#f0ece0; color:#8a7a45; font-size:10px; font-weight:800; }

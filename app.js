@@ -5,6 +5,7 @@ const STORE_NAME = "workouts";
 const ACTIVE_KEY = "pulse_active_workout_v1";
 const FAVORITES_KEY = "pulse_favorite_exercises_v1";
 const TEMPLATES_KEY = "pulse_templates_v1";
+const CUSTOM_EXERCISES_KEY = "pulse_custom_exercises_v1";
 
 const navButtons = document.querySelectorAll(".nav-button");
 const views = document.querySelectorAll(".view");
@@ -51,6 +52,11 @@ const duplicateWorkoutDate = document.querySelector("#duplicate-workout-date");
 const duplicateWorkoutDuration = document.querySelector("#duplicate-workout-duration");
 const duplicateWorkoutExercises = document.querySelector("#duplicate-workout-exercises");
 const cancelDuplicateWorkout = document.querySelector("#cancel-duplicate-workout");
+const newCustomExerciseButton = document.querySelector("#new-custom-exercise-button");
+const customExercisePanel = document.querySelector("#custom-exercise-panel");
+const customExerciseForm = document.querySelector("#custom-exercise-form");
+const customExerciseName = document.querySelector("#custom-exercise-name");
+const cancelCustomExercise = document.querySelector("#cancel-custom-exercise");
 
 let workouts = [];
 let activeWorkout = null;
@@ -187,6 +193,29 @@ function toggleFavorite(name) {
     saveJson(FAVORITES_KEY, updated.sort((a, b) => a.localeCompare(b)));
 }
 
+function getCustomExercises() {
+    return [...new Set(loadJson(CUSTOM_EXERCISES_KEY, []).map((item) => String(item).trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+function isCustomExercise(name) {
+    return getCustomExercises().some((item) => item.toLowerCase() === name.toLowerCase());
+}
+
+function exerciseAlreadyExists(name) {
+    return getAllExerciseNames().some((item) => item.toLowerCase() === name.toLowerCase());
+}
+
+function addCustomExercise(name) {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return { ok: false, reason: "empty" };
+    if (exerciseAlreadyExists(cleanName)) return { ok: false, reason: "duplicate" };
+
+    const custom = getCustomExercises();
+    custom.push(cleanName);
+    saveJson(CUSTOM_EXERCISES_KEY, custom);
+    return { ok: true };
+}
+
 function getAllExerciseNames() {
     const names = new Map();
     workouts.forEach((workout) => workout.exercises.forEach((exercise) => {
@@ -194,6 +223,7 @@ function getAllExerciseNames() {
         if (name && name !== "Nuevo ejercicio") names.set(name.toLowerCase(), name);
     }));
     getFavorites().forEach((name) => names.set(name.toLowerCase(), name));
+    getCustomExercises().forEach((name) => names.set(name.toLowerCase(), name));
     return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
 
@@ -559,7 +589,13 @@ exerciseSummaryContainer.addEventListener("click", (event) => {
 
 function openExerciseDetail(name) {
     const summary = calculateExerciseSummary().find((exercise) => exercise.name === name);
-    if (!summary) return;
+    if (!summary) {
+        exerciseDetailTitle.textContent = name;
+        exerciseDetailRecord.innerHTML = `<div><strong>Sin sesiones</strong><span>TODAVÍA NO REGISTRADO</span></div>`;
+        exerciseDetailHistory.innerHTML = `<p class="muted">Este ejercicio no tiene historial todavía. Añádelo a una sesión para empezar a registrarlo.</p>`;
+        openPanel(exerciseDetailPanel);
+        return;
+    }
 
     exerciseDetailTitle.textContent = summary.name;
     exerciseDetailRecord.innerHTML = `
@@ -577,7 +613,7 @@ function openExerciseDetail(name) {
 closeExerciseDetail.addEventListener("click", () => closePanel(exerciseDetailPanel));
 exerciseDetailPanel.addEventListener("click", (event) => { if (event.target === exerciseDetailPanel) closePanel(exerciseDetailPanel); });
 
-/* ---------- BIBLIOTECA, FAVORITOS Y PLANTILLAS ---------- */
+/* ---------- BIBLIOTECA, FAVORITOS, PERSONALIZADOS Y PLANTILLAS ---------- */
 
 function renderLibrary() {
     const names = getAllExerciseNames();
@@ -585,8 +621,10 @@ function renderLibrary() {
 
     allExerciseList.innerHTML = names.length ? names.map((name) => {
         const active = isFavorite(name);
-        return `<div class="library-item"><div><span class="library-item-name">${escapeHtml(name)}</span><span class="library-item-meta">${active ? "Guardado como favorito" : "Disponible para guardar"}</span></div><button class="favorite-button ${active ? "active" : ""}" data-favorite-name="${escapeHtml(name)}" type="button"><span>${active ? "★" : "☆"}</span>${active ? "Guardado" : "Favorito"}</button></div>`;
-    }).join("") : `<p class="muted">Todavía no hay ejercicios registrados. Crea una sesión y añade un ejercicio.</p>`;
+        const custom = isCustomExercise(name);
+        const metaText = active ? "Guardado como favorito" : (custom ? "Ejercicio personalizado, sin sesiones todavía" : "Disponible para guardar");
+        return `<div class="library-item" data-exercise-open="${escapeHtml(name)}"><div><span class="library-item-name">${escapeHtml(name)}</span><span class="library-item-meta">${metaText}${custom ? ` <span class="custom-exercise-tag">PERSONALIZADO</span>` : ""}</span></div><button class="favorite-button ${active ? "active" : ""}" data-favorite-name="${escapeHtml(name)}" type="button"><span>${active ? "★" : "☆"}</span>${active ? "Guardado" : "Favorito"}</button></div>`;
+    }).join("") : `<p class="muted">Todavía no hay ejercicios. Crea uno con + Crear o añádelo desde una sesión.</p>`;
 
     const favorites = getFavorites();
     document.querySelector("#favorite-count").textContent = favorites.length;
@@ -596,10 +634,11 @@ function renderLibrary() {
 }
 
 allExerciseList.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-favorite-name]");
-    if (!button) return;
-    toggleFavorite(button.dataset.favoriteName);
-    renderLibrary();
+    const favoriteButton = event.target.closest("[data-favorite-name]");
+    if (favoriteButton) { toggleFavorite(favoriteButton.dataset.favoriteName); renderLibrary(); return; }
+
+    const item = event.target.closest("[data-exercise-open]");
+    if (item) openExerciseDetail(item.dataset.exerciseOpen);
 });
 
 favoriteListContainer.addEventListener("click", (event) => {
@@ -623,7 +662,7 @@ templateListContainer.addEventListener("click", (event) => {
 
 function renderTemplateOptions() {
     const names = getAllExerciseNames();
-    templateExerciseOptions.innerHTML = names.length ? names.map((name) => `<label class="template-exercise-option"><input type="checkbox" value="${escapeHtml(name)}"><span>${escapeHtml(name)}</span></label>`).join("") : `<p class="muted">Primero registra un ejercicio en una sesión.</p>`;
+    templateExerciseOptions.innerHTML = names.length ? names.map((name) => `<label class="template-exercise-option"><input type="checkbox" value="${escapeHtml(name)}"><span>${escapeHtml(name)}</span></label>`).join("") : `<p class="muted">Primero crea un ejercicio o regístralo en una sesión.</p>`;
 }
 
 function renderTemplateSelector() {
@@ -637,6 +676,27 @@ selectTemplateList.addEventListener("click", (event) => {
     const template = getTemplates().find((item) => item.id === button.dataset.templateId);
     closePanel(selectTemplatePanel);
     if (template) startTemplateFlow(template);
+});
+
+newCustomExerciseButton.addEventListener("click", () => { customExerciseName.value = ""; openPanel(customExercisePanel); });
+cancelCustomExercise.addEventListener("click", () => closePanel(customExercisePanel));
+customExercisePanel.addEventListener("click", (event) => { if (event.target === customExercisePanel) closePanel(customExercisePanel); });
+
+customExerciseForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = customExerciseName.value.trim();
+    if (!name) return;
+
+    const result = addCustomExercise(name);
+    if (!result.ok && result.reason === "duplicate") {
+        window.alert(`Ya existe un ejercicio llamado "${name}" en tu biblioteca.`);
+        return;
+    }
+    if (!result.ok) return;
+
+    renderLibrary();
+    customExerciseForm.reset();
+    closePanel(customExercisePanel);
 });
 
 /* ---------- FLUJO DE SESIONES ---------- */
@@ -691,7 +751,7 @@ async function finishWorkout() {
 /* ---------- COPIAS DE SEGURIDAD ---------- */
 
 function exportBackup() {
-    const backup = { version: "7", workouts, favorites: getFavorites(), templates: getTemplates() };
+    const backup = { version: "8", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
@@ -711,6 +771,7 @@ function importBackup(event) {
             workouts = normaliseWorkouts(Array.isArray(imported) ? imported : imported.workouts);
             saveJson(FAVORITES_KEY, Array.isArray(imported.favorites) ? imported.favorites : []);
             saveJson(TEMPLATES_KEY, Array.isArray(imported.templates) ? imported.templates : []);
+            saveJson(CUSTOM_EXERCISES_KEY, Array.isArray(imported.customExercises) ? imported.customExercises : []);
             await persist();
             render();
             window.alert("Copia importada correctamente");

@@ -56,7 +56,11 @@
         <section id="library-view" class="view hidden-view">
             <section class="section-heading"><div><p class="eyebrow">ORGANIZACIÓN</p><h2>Ejercicios</h2></div></section>
             <div class="library-card premium-surface">
-                <div class="library-heading"><div><p class="eyebrow">BIBLIOTECA</p><h3>Todos mis ejercicios</h3><p class="muted library-description">Ejercicios detectados en tus sesiones.</p></div><span id="exercise-count" class="set-count">0</span></div>
+                <div class="library-heading">
+                    <div><p class="eyebrow">BIBLIOTECA</p><h3>Todos mis ejercicios</h3><p class="muted library-description">Ejercicios detectados en tus sesiones y creados manualmente.</p></div>
+                    <button id="new-custom-exercise-button" class="small-action" type="button">+ Crear</button>
+                </div>
+                <span id="exercise-count" class="set-count exercise-count-badge">0</span>
                 <div id="all-exercise-list"></div>
             </div>
             <div class="library-card premium-surface">
@@ -100,6 +104,18 @@
                 <form id="add-exercise-form">
                     <label>Nombre del ejercicio<input id="add-exercise-name" type="text" autocomplete="off" placeholder="Ejemplo: Press banca" required></label>
                     <div class="dialog-actions"><button id="cancel-add-exercise" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Añadir ejercicio</button></div>
+                </form>
+            </div>
+        </section>
+
+        <section id="custom-exercise-panel" class="overlay-panel hidden-panel">
+            <div class="overlay-card">
+                <p class="eyebrow">EJERCICIO PERSONALIZADO</p>
+                <h2>Crear ejercicio</h2>
+                <p class="muted">Se guardará en tu biblioteca, aunque no lo hayas usado todavía en ninguna sesión.</p>
+                <form id="custom-exercise-form">
+                    <label>Nombre del ejercicio<input id="custom-exercise-name" type="text" autocomplete="off" placeholder="Ejemplo: Face pull" required></label>
+                    <div class="dialog-actions"><button id="cancel-custom-exercise" class="secondary-button" type="button">Cancelar</button><button class="primary-button" type="submit">Crear ejercicio</button></div>
                 </form>
             </div>
         </section>

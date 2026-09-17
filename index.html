@@ -7,11 +7,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Pulse">
-
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="styles.css">
-
     <title>Pulse Training</title>
 </head>
 <body>
@@ -21,111 +19,53 @@
                 <p class="eyebrow">TRAINING LOG</p>
                 <h1>Pulse</h1>
             </div>
-            <button class="icon-button" id="menu-button" type="button" aria-label="Abrir menú">⋯</button>
+            <div class="connection-status" id="connection-status">Local</div>
         </header>
 
-        <section class="hero-card">
-            <div>
-                <p class="muted">Tu entrenamiento</p>
-                <h2>Registra el progreso<br>una serie cada vez.</h2>
-            </div>
-            <div class="hero-symbol">✦</div>
-        </section>
-
         <section id="summary-view" class="view active-view">
-            <section class="stats-grid">
-                <div class="stat-card"><span class="stat-number" id="total-sessions">0</span><span class="muted">sesiones</span></div>
-                <div class="stat-card"><span class="stat-number" id="total-minutes">0</span><span class="muted">minutos totales</span></div>
-                <div class="stat-card"><span class="stat-number" id="total-sets">0</span><span class="muted">sets realizados</span></div>
-                <div class="stat-card"><span class="stat-number" id="total-volume">0</span><span class="muted">kg de volumen</span></div>
-            </section>
-
-            <section class="section-heading">
+            <section class="summary-header premium-surface">
                 <div>
-                    <p class="eyebrow">HISTORIAL</p>
-                    <h2>Entrenamientos recientes</h2>
+                    <p class="eyebrow">TU HISTORIAL</p>
+                    <h2>Entrenamientos</h2>
+                    <p class="muted">Tu progreso, sesión a sesión.</p>
                 </div>
+                <div class="summary-count"><strong id="total-sessions">0</strong><span>sesiones</span></div>
             </section>
-
             <div id="workout-list"></div>
         </section>
 
         <section id="progress-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">ANÁLISIS</p>
-                    <h2>Tu progreso</h2>
-                </div>
-            </section>
-            <div class="progress-card">
-                <p class="eyebrow">EJERCICIOS</p>
-                <div id="exercise-summary"></div>
-            </div>
+            <section class="section-heading"><div><p class="eyebrow">ANÁLISIS</p><h2>Tu progreso</h2></div></section>
+            <div class="progress-highlight premium-surface"><p class="eyebrow">MEJORES MARCAS</p><h3>Tu peso máximo por ejercicio</h3><p class="muted">La evolución que puedes aplicar en la próxima sesión.</p></div>
+            <div class="progress-card premium-surface"><div id="exercise-summary"></div></div>
+            <div class="progress-card premium-surface"><p class="eyebrow">CONSTANCIA</p><div class="consistency-grid"><div><strong id="progress-sessions">0</strong><span>sesiones</span></div><div><strong id="progress-minutes">0</strong><span>minutos</span></div><div><strong id="progress-types">0</strong><span>tipos usados</span></div></div></div>
         </section>
 
         <section id="profile-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">PERSONAL</p>
-                    <h2>Perfil</h2>
-                </div>
-            </section>
-            <div class="profile-card">
-                <div class="avatar">PT</div>
-                <h3>Tu perfil de entrenamiento</h3>
-                <p class="muted">Tus datos se guardan en este dispositivo.</p>
-            </div>
-            <div class="profile-actions">
-                <button class="secondary-button" id="export-button" type="button">Exportar copia de seguridad</button>
-                <label class="secondary-button file-button">
-                    Importar copia de seguridad
-                    <input id="import-input" type="file" accept="application/json">
-                </label>
-            </div>
+            <section class="section-heading"><div><p class="eyebrow">PERSONAL</p><h2>Perfil</h2></div></section>
+            <div class="profile-card premium-surface"><div class="avatar">PT</div><h3>Tu perfil de entrenamiento</h3><p class="muted">Tus sesiones se guardan localmente en este dispositivo.</p></div>
+            <div class="profile-actions"><button class="secondary-button" id="export-button" type="button">Exportar copia de seguridad</button><label class="secondary-button file-button">Importar copia de seguridad<input id="import-input" type="file" accept="application/json"></label></div>
+        </section>
+
+        <section id="active-workout-view" class="view hidden-view">
+            <section class="active-header premium-surface"><div><p class="eyebrow">SESIÓN ACTIVA</p><h2 id="active-workout-title">Entrenamiento</h2><span class="muted" id="active-workout-meta"></span></div><button id="finish-workout-button" class="text-button" type="button">Finalizar</button></section>
+            <div id="active-exercise-list"></div>
+            <button id="add-active-exercise-button" class="secondary-button" type="button">+ Añadir ejercicio</button>
         </section>
 
         <section id="new-workout-view" class="view hidden-view">
-            <section class="section-heading">
-                <div>
-                    <p class="eyebrow">NUEVO REGISTRO</p>
-                    <h2>Crear sesión</h2>
-                </div>
-                <button id="close-workout-button" class="text-button" type="button">Cerrar</button>
-            </section>
-
-            <form id="workout-form" class="workout-form">
+            <section class="section-heading"><div><p class="eyebrow">NUEVO REGISTRO</p><h2>Iniciar sesión</h2></div><button id="close-workout-button" class="text-button" type="button">Cerrar</button></section>
+            <form id="workout-form" class="workout-form premium-surface">
                 <label>Día<input id="workout-date" type="date" required></label>
-                <label>Duración, minutos<input id="workout-duration" type="number" min="1" placeholder="60" required></label>
+                <label>Duración estimada, minutos<input id="workout-duration" type="number" min="1" placeholder="60" required></label>
                 <label>Tipo de entrenamiento<select id="workout-type" required><option value="">Selecciona una opción</option><option>Tren superior</option><option>Tren inferior</option><option>Core</option></select></label>
-                <div id="exercise-list"></div>
-                <button id="add-exercise-button" class="secondary-button" type="button">+ Añadir ejercicio</button>
-                <button class="primary-button" type="submit">Guardar sesión</button>
+                <button class="primary-button" type="submit">Iniciar entrenamiento</button>
             </form>
         </section>
 
-        <button class="primary-button" id="new-workout-button" type="button">+ Nueva sesión</button>
-
-        <nav class="bottom-nav">
-            <button class="nav-button active" data-view="summary-view" type="button">Resumen</button>
-            <button class="nav-button" data-view="progress-view" type="button">Progreso</button>
-            <button class="nav-button" data-view="profile-view" type="button">Perfil</button>
-        </nav>
+        <button class="primary-button floating-action" id="new-workout-button" type="button">+ Nueva sesión</button>
+        <nav class="bottom-nav"><button class="nav-button active" data-view="summary-view" type="button">Resumen</button><button class="nav-button" data-view="progress-view" type="button">Progreso</button><button class="nav-button" data-view="profile-view" type="button">Perfil</button></nav>
     </main>
-
-    <template id="exercise-template">
-        <div class="exercise-form-card">
-            <div class="exercise-form-header">
-                <label>Ejercicio<input class="exercise-name" type="text" placeholder="Ej. Press banca" required></label>
-                <button class="remove-exercise-button" type="button">Eliminar</button>
-            </div>
-            <div class="set-inputs">
-                <label>Set<input class="set-number-input" type="number" min="1" required></label>
-                <label>Reps<input class="reps-input" type="number" min="1" placeholder="10" required></label>
-                <label>Peso kg<input class="weight-input" type="number" min="0" step="0.5" placeholder="40" required></label>
-            </div>
-            <button class="add-set-button" type="button">+ Añadir set</button>
-        </div>
-    </template>
 
     <script src="app.js"></script>
 </body>

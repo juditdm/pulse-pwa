@@ -57,6 +57,8 @@ const customExercisePanel = document.querySelector("#custom-exercise-panel");
 const customExerciseForm = document.querySelector("#custom-exercise-form");
 const customExerciseName = document.querySelector("#custom-exercise-name");
 const cancelCustomExercise = document.querySelector("#cancel-custom-exercise");
+const bootScreen = document.querySelector("#boot-screen");
+const toastContainer = document.querySelector("#toast-container");
 
 let workouts = [];
 let activeWorkout = null;
@@ -68,6 +70,18 @@ let saveSequence = Promise.resolve();
 function createId() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function showToast(message, variant = "default") {
+    const toast = document.createElement("div");
+    toast.className = `toast ${variant === "success" ? "toast-success" : ""}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("toast-visible"));
+    setTimeout(() => {
+        toast.classList.remove("toast-visible");
+        setTimeout(() => toast.remove(), 250);
+    }, 2400);
 }
 
 function openDatabase() {
@@ -169,6 +183,9 @@ function persistActiveWorkout() {
         await new Promise((resolve) => setTimeout(resolve, 80));
         activeSaveStatus.textContent = "Guardado local";
         activeSaveStatus.classList.remove("saving");
+        activeSaveStatus.classList.remove("saved-flash");
+        void activeSaveStatus.offsetWidth;
+        activeSaveStatus.classList.add("saved-flash");
     });
     return saveSequence;
 }
@@ -191,6 +208,7 @@ function toggleFavorite(name) {
     const exists = favorites.some((item) => item.toLowerCase() === name.toLowerCase());
     const updated = exists ? favorites.filter((item) => item.toLowerCase() !== name.toLowerCase()) : [...favorites, name];
     saveJson(FAVORITES_KEY, updated.sort((a, b) => a.localeCompare(b)));
+    showToast(exists ? `${name} ya no está en favoritos` : `${name} añadido a favoritos`, exists ? "default" : "success");
 }
 
 function getCustomExercises() {
@@ -343,7 +361,8 @@ activeExerciseList.addEventListener("click", async (event) => {
     const exercise = findExercise(card.dataset.exerciseId);
     if (!exercise) return;
 
-    const action = event.target.closest("[data-action]")?.dataset.action;
+    const actionButton = event.target.closest("[data-action]");
+    const action = actionButton?.dataset.action;
     if (!action) return;
 
     if (action === "rename-exercise") {
@@ -360,6 +379,7 @@ activeExerciseList.addEventListener("click", async (event) => {
         activeWorkout.exercises = activeWorkout.exercises.filter((item) => item.id !== exercise.id);
         await persistActiveWorkout();
         renderActiveWorkout();
+        showToast("Ejercicio eliminado de la sesión");
         return;
     }
 
@@ -377,6 +397,13 @@ activeExerciseList.addEventListener("click", async (event) => {
         set.completed = !set.completed;
         await persistActiveWorkout();
         renderActiveWorkout();
+        requestAnimationFrame(() => {
+            const button = activeExerciseList.querySelector(`[data-set-id="${set.id}"] .complete-set-button`);
+            if (button && set.completed) {
+                button.classList.add("just-completed");
+                setTimeout(() => button.classList.remove("just-completed"), 300);
+            }
+        });
         return;
     }
 
@@ -485,8 +512,14 @@ function render() {
     renderLibrary();
 }
 
+const emptyStateIcon = `<svg class="empty-state-icon" viewBox="0 0 24 24"><path d="M12 3v18M4 12h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/></svg>`;
+
 function renderWorkouts() {
-    if (!workouts.length) { workoutListContainer.innerHTML = `<div class="empty-state">Todavía no hay entrenamientos registrados.</div>`; return; }
+    if (!workouts.length) {
+        workoutListContainer.innerHTML = `<div class="empty-state">${emptyStateIcon}<p class="empty-state-text muted">Todavía no has registrado ningún entrenamiento.</p><button class="empty-state-action" id="empty-start-workout" type="button">Crear mi primera sesión</button></div>`;
+        document.querySelector("#empty-start-workout")?.addEventListener("click", () => { pendingTemplate = null; prepareWorkoutForm(); showView("new-workout-view"); });
+        return;
+    }
     const groups = {};
     workouts.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach((workout) => { const key = workout.date.slice(0, 7); if (!groups[key]) groups[key] = []; groups[key].push(workout); });
     workoutListContainer.innerHTML = Object.entries(groups).map(([monthKey, monthWorkouts]) => {
@@ -536,6 +569,7 @@ duplicateWorkoutForm.addEventListener("submit", (event) => {
     renderActiveWorkout();
     closePanel(duplicateWorkoutPanel);
     showView("active-workout-view");
+    showToast("Sesión creada a partir de la anterior", "success");
 });
 
 cancelDuplicateWorkout.addEventListener("click", () => { pendingDuplicate = null; closePanel(duplicateWorkoutPanel); });
@@ -559,7 +593,7 @@ function renderProgress() {
 
 function renderExerciseSummary() {
     const summary = calculateExerciseSummary();
-    if (!summary.length) { exerciseSummaryContainer.innerHTML = `<p class="muted">Todavía no hay ejercicios registrados.</p>`; return; }
+    if (!summary.length) { exerciseSummaryContainer.innerHTML = `<div class="empty-state">${emptyStateIcon}<p class="empty-state-text muted">Todavía no hay ejercicios registrados.</p></div>`; return; }
 
     exerciseSummaryContainer.innerHTML = summary.map((exercise) => {
         const isRecord = exercise.lastWeight >= exercise.maxWeight;
@@ -624,7 +658,9 @@ function renderLibrary() {
         const custom = isCustomExercise(name);
         const metaText = active ? "Guardado como favorito" : (custom ? "Ejercicio personalizado, sin sesiones todavía" : "Disponible para guardar");
         return `<div class="library-item" data-exercise-open="${escapeHtml(name)}"><div><span class="library-item-name">${escapeHtml(name)}</span><span class="library-item-meta">${metaText}${custom ? ` <span class="custom-exercise-tag">PERSONALIZADO</span>` : ""}</span></div><button class="favorite-button ${active ? "active" : ""}" data-favorite-name="${escapeHtml(name)}" type="button"><span>${active ? "★" : "☆"}</span>${active ? "Guardado" : "Favorito"}</button></div>`;
-    }).join("") : `<p class="muted">Todavía no hay ejercicios. Crea uno con + Crear o añádelo desde una sesión.</p>`;
+    }).join("") : `<div class="empty-state">${emptyStateIcon}<p class="empty-state-text muted">Todavía no hay ejercicios.</p><button class="empty-state-action" id="empty-create-exercise" type="button">Crear mi primer ejercicio</button></div>`;
+
+    document.querySelector("#empty-create-exercise")?.addEventListener("click", () => { customExerciseName.value = ""; openPanel(customExercisePanel); });
 
     const favorites = getFavorites();
     document.querySelector("#favorite-count").textContent = favorites.length;
@@ -697,6 +733,7 @@ customExerciseForm.addEventListener("submit", (event) => {
     renderLibrary();
     customExerciseForm.reset();
     closePanel(customExercisePanel);
+    showToast(`${name} creado en tu biblioteca`, "success");
 });
 
 /* ---------- FLUJO DE SESIONES ---------- */
@@ -746,12 +783,13 @@ async function finishWorkout() {
     activeWorkout = null;
     render();
     showView("summary-view");
+    showToast("Sesión guardada correctamente", "success");
 }
 
 /* ---------- COPIAS DE SEGURIDAD ---------- */
 
 function exportBackup() {
-    const backup = { version: "8", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
+    const backup = { version: "9", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
@@ -759,6 +797,7 @@ function exportBackup() {
     link.download = `pulse-backup-${today()}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    showToast("Copia de seguridad exportada", "success");
 }
 
 function importBackup(event) {
@@ -774,7 +813,7 @@ function importBackup(event) {
             saveJson(CUSTOM_EXERCISES_KEY, Array.isArray(imported.customExercises) ? imported.customExercises : []);
             await persist();
             render();
-            window.alert("Copia importada correctamente");
+            showToast("Copia importada correctamente", "success");
         } catch { window.alert("No se ha podido importar el archivo"); }
     };
     reader.readAsText(file);
@@ -819,6 +858,7 @@ templateForm.addEventListener("submit", (event) => {
     renderLibrary();
     templateForm.reset();
     closePanel(templatePanel);
+    showToast(`Plantilla "${name}" guardada`, "success");
 });
 
 [addExercisePanel, templatePanel, selectTemplatePanel].forEach((panel) => panel.addEventListener("click", (event) => { if (event.target === panel) closePanel(panel); }));
@@ -834,6 +874,9 @@ async function initialise() {
     } catch (error) {
         console.error(error);
         connectionStatus.textContent = "Error local";
+    } finally {
+        bootScreen.classList.add("boot-hidden");
+        setTimeout(() => bootScreen.remove(), 400);
     }
 }
 

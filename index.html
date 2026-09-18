@@ -54,6 +54,17 @@
                 <p class="eyebrow">HISTORIAL</p>
                 <h2 id="exercise-detail-title">Ejercicio</h2>
                 <div id="exercise-detail-record" class="exercise-detail-record"></div>
+
+                <div class="chart-period-selector" id="chart-period-selector">
+                    <button class="chart-period-button" data-period="30" type="button">1 mes</button>
+                    <button class="chart-period-button" data-period="90" type="button">3 meses</button>
+                    <button class="chart-period-button active" data-period="all" type="button">Todo</button>
+                </div>
+                <div class="chart-container" id="exercise-chart-container">
+                    <svg id="exercise-chart-svg" viewBox="0 0 300 120" preserveAspectRatio="none"></svg>
+                    <div id="exercise-chart-empty" class="chart-empty hidden-panel">No hay suficientes datos en este periodo.</div>
+                </div>
+
                 <div id="exercise-detail-history" class="exercise-detail-history"></div>
                 <button id="close-exercise-detail" class="secondary-button" type="button">Cerrar</button>
             </div>

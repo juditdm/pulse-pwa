@@ -164,3 +164,13 @@ h3 { margin-bottom:0; font-size:19px; }
 
 .save-status.saved-flash { animation:savedFlash .5s ease; }
 @keyframes savedFlash { 0%{opacity:.4} 100%{opacity:1} }
+.chart-period-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:14px; }
+.chart-period-button { padding:9px 6px; border:1px solid var(--border); border-radius:11px; background:#fff; color:var(--muted); font-size:11px; font-weight:800; }
+.chart-period-button.active { border-color:var(--dark-green); background:var(--green); color:var(--dark-green); }
+.chart-container { position:relative; height:130px; margin-bottom:18px; padding:10px 8px; border:1px solid var(--border); border-radius:16px; background:#fbfcfa; }
+.chart-container svg { width:100%; height:100%; overflow:visible; }
+.chart-line { fill:none; stroke:var(--dark-green); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.chart-area { fill:rgba(49,93,71,.09); stroke:none; }
+.chart-dot { fill:var(--dark-green); }
+.chart-dot-record { fill:#fff; stroke:var(--dark-green); stroke-width:2; }
+.chart-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; text-align:center; padding:0 20px; }

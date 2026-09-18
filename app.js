@@ -59,6 +59,9 @@ const customExerciseName = document.querySelector("#custom-exercise-name");
 const cancelCustomExercise = document.querySelector("#cancel-custom-exercise");
 const bootScreen = document.querySelector("#boot-screen");
 const toastContainer = document.querySelector("#toast-container");
+const chartPeriodSelector = document.querySelector("#chart-period-selector");
+const chartSvg = document.querySelector("#exercise-chart-svg");
+const chartEmpty = document.querySelector("#exercise-chart-empty");
 
 let workouts = [];
 let activeWorkout = null;
@@ -66,6 +69,8 @@ let pendingTemplate = null;
 let pendingDuplicate = null;
 let databasePromise = openDatabase();
 let saveSequence = Promise.resolve();
+let currentDetailExercise = null;
+let currentChartPeriod = "all";
 
 function createId() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -274,6 +279,12 @@ function getIsoWeekKey(dateString) {
     const firstThursday = new Date(date.getFullYear(), 0, 4);
     const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getDay() + 6) % 7)) / 7);
     return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function daysBetween(dateString) {
+    const date = new Date(`${dateString}T00:00:00`);
+    const now = new Date(`${today()}T00:00:00`);
+    return Math.round((now - date) / 86400000);
 }
 
 function showView(viewId) {
@@ -622,11 +633,16 @@ exerciseSummaryContainer.addEventListener("click", (event) => {
 });
 
 function openExerciseDetail(name) {
+    currentDetailExercise = name;
+    currentChartPeriod = "all";
+    chartPeriodSelector.querySelectorAll(".chart-period-button").forEach((button) => button.classList.toggle("active", button.dataset.period === "all"));
+
     const summary = calculateExerciseSummary().find((exercise) => exercise.name === name);
     if (!summary) {
         exerciseDetailTitle.textContent = name;
         exerciseDetailRecord.innerHTML = `<div><strong>Sin sesiones</strong><span>TODAVÍA NO REGISTRADO</span></div>`;
         exerciseDetailHistory.innerHTML = `<p class="muted">Este ejercicio no tiene historial todavía. Añádelo a una sesión para empezar a registrarlo.</p>`;
+        renderExerciseChart([]);
         openPanel(exerciseDetailPanel);
         return;
     }
@@ -641,8 +657,89 @@ function openExerciseDetail(name) {
     const history = summary.history.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
     exerciseDetailHistory.innerHTML = history.map((item) => `<div class="exercise-detail-row"><span>${formatDateShort(item.date)}</span><strong>${item.reps} reps · ${item.weight} kg</strong></div>`).join("");
 
+    renderExerciseChartForCurrentPeriod();
     openPanel(exerciseDetailPanel);
 }
+
+function renderExerciseChartForCurrentPeriod() {
+    const summary = calculateExerciseSummary().find((exercise) => exercise.name === currentDetailExercise);
+    if (!summary) { renderExerciseChart([]); return; }
+
+    let points = summary.history.slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (currentChartPeriod !== "all") {
+        const limitDays = Number(currentChartPeriod);
+        points = points.filter((item) => daysBetween(item.date) <= limitDays);
+    }
+
+    const byDate = new Map();
+    points.forEach((item) => {
+        const existing = byDate.get(item.date);
+        if (!existing || item.weight > existing.weight) byDate.set(item.date, item);
+    });
+
+    renderExerciseChart([...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)));
+}
+
+function renderExerciseChart(points) {
+    chartSvg.innerHTML = "";
+
+    if (points.length < 2) {
+        chartEmpty.classList.remove("hidden-panel");
+        return;
+    }
+    chartEmpty.classList.add("hidden-panel");
+
+    const width = 300;
+    const height = 120;
+    const paddingX = 10;
+    const paddingY = 14;
+
+    const weights = points.map((point) => point.weight);
+    const minWeight = Math.min(...weights);
+    const maxWeight = Math.max(...weights);
+    const range = maxWeight - minWeight || 1;
+
+    const coordinates = points.map((point, index) => {
+        const x = paddingX + (index / (points.length - 1)) * (width - paddingX * 2);
+        const y = height - paddingY - ((point.weight - minWeight) / range) * (height - paddingY * 2);
+        return { x, y, weight: point.weight, date: point.date };
+    });
+
+    const linePoints = coordinates.map((coordinate) => `${coordinate.x.toFixed(1)},${coordinate.y.toFixed(1)}`).join(" ");
+    const areaPoints = `${paddingX},${height - paddingY} ${linePoints} ${coordinates[coordinates.length - 1].x.toFixed(1)},${height - paddingY}`;
+
+    const svgNamespace = "http://www.w3.org/2000/svg";
+
+    const area = document.createElementNS(svgNamespace, "polygon");
+    area.setAttribute("points", areaPoints);
+    area.setAttribute("class", "chart-area");
+    chartSvg.appendChild(area);
+
+    const line = document.createElementNS(svgNamespace, "polyline");
+    line.setAttribute("points", linePoints);
+    line.setAttribute("class", "chart-line");
+    chartSvg.appendChild(line);
+
+    const maxPointWeight = Math.max(...coordinates.map((coordinate) => coordinate.weight));
+
+    coordinates.forEach((coordinate) => {
+        const circle = document.createElementNS(svgNamespace, "circle");
+        circle.setAttribute("cx", coordinate.x.toFixed(1));
+        circle.setAttribute("cy", coordinate.y.toFixed(1));
+        const isTop = coordinate.weight === maxPointWeight;
+        circle.setAttribute("r", isTop ? "4.2" : "2.4");
+        circle.setAttribute("class", isTop ? "chart-dot-record" : "chart-dot");
+        chartSvg.appendChild(circle);
+    });
+}
+
+chartPeriodSelector.addEventListener("click", (event) => {
+    const button = event.target.closest(".chart-period-button");
+    if (!button) return;
+    currentChartPeriod = button.dataset.period;
+    chartPeriodSelector.querySelectorAll(".chart-period-button").forEach((item) => item.classList.toggle("active", item === button));
+    renderExerciseChartForCurrentPeriod();
+});
 
 closeExerciseDetail.addEventListener("click", () => closePanel(exerciseDetailPanel));
 exerciseDetailPanel.addEventListener("click", (event) => { if (event.target === exerciseDetailPanel) closePanel(exerciseDetailPanel); });
@@ -789,7 +886,7 @@ async function finishWorkout() {
 /* ---------- COPIAS DE SEGURIDAD ---------- */
 
 function exportBackup() {
-    const backup = { version: "9", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
+    const backup = { version: "10", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");

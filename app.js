@@ -6,6 +6,8 @@ const ACTIVE_KEY = "pulse_active_workout_v1";
 const FAVORITES_KEY = "pulse_favorite_exercises_v1";
 const TEMPLATES_KEY = "pulse_templates_v1";
 const CUSTOM_EXERCISES_KEY = "pulse_custom_exercises_v1";
+const UNDO_SNAPSHOT_KEY = "pulse_undo_snapshot_v1";
+const WAKE_LOCK_PREF_KEY = "pulse_wake_lock_preference_v1";
 
 const navButtons = document.querySelectorAll(".nav-button");
 const views = document.querySelectorAll(".view");
@@ -14,6 +16,11 @@ const closeWorkoutButton = document.querySelector("#close-workout-button");
 const workoutForm = document.querySelector("#workout-form");
 const exportButton = document.querySelector("#export-button");
 const importInput = document.querySelector("#import-input");
+const undoImportButton = document.querySelector("#undo-import-button");
+const importConfirmPanel = document.querySelector("#import-confirm-panel");
+const importSummary = document.querySelector("#import-summary");
+const cancelImport = document.querySelector("#cancel-import");
+const confirmImport = document.querySelector("#confirm-import");
 const activeWorkoutTitle = document.querySelector("#active-workout-title");
 const activeWorkoutMeta = document.querySelector("#active-workout-meta");
 const activeSaveStatus = document.querySelector("#active-save-status");
@@ -62,15 +69,29 @@ const toastContainer = document.querySelector("#toast-container");
 const chartPeriodSelector = document.querySelector("#chart-period-selector");
 const chartSvg = document.querySelector("#exercise-chart-svg");
 const chartEmpty = document.querySelector("#exercise-chart-empty");
+const wakeLockToggle = document.querySelector("#wake-lock-toggle");
+const calendarPrev = document.querySelector("#calendar-prev");
+const calendarNext = document.querySelector("#calendar-next");
+const calendarMonthLabel = document.querySelector("#calendar-month-label");
+const calendarGrid = document.querySelector("#calendar-grid");
+const dayDetailPanel = document.querySelector("#day-detail-panel");
+const dayDetailDate = document.querySelector("#day-detail-date");
+const dayDetailTitle = document.querySelector("#day-detail-title");
+const dayDetailContent = document.querySelector("#day-detail-content");
+const closeDayDetail = document.querySelector("#close-day-detail");
 
 let workouts = [];
 let activeWorkout = null;
 let pendingTemplate = null;
 let pendingDuplicate = null;
+let pendingImport = null;
 let databasePromise = openDatabase();
 let saveSequence = Promise.resolve();
 let currentDetailExercise = null;
 let currentChartPeriod = "all";
+let wakeLockSentinel = null;
+let wakeLockWanted = false;
+let calendarViewDate = new Date();
 
 function createId() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -88,6 +109,68 @@ function showToast(message, variant = "default") {
         setTimeout(() => toast.remove(), 250);
     }, 2400);
 }
+
+/* ---------- PANTALLA ACTIVA (WAKE LOCK) ---------- */
+
+function isWakeLockSupported() {
+    return "wakeLock" in navigator;
+}
+
+async function requestWakeLock() {
+    if (!isWakeLockSupported()) {
+        showToast("Tu navegador no permite mantener la pantalla activa");
+        setWakeToggleVisual(false);
+        wakeLockWanted = false;
+        return;
+    }
+
+    try {
+        wakeLockSentinel = await navigator.wakeLock.request("screen");
+        wakeLockWanted = true;
+        setWakeToggleVisual(true);
+        wakeLockSentinel.addEventListener("release", () => {
+            wakeLockSentinel = null;
+            if (wakeLockWanted) setWakeToggleVisual(false);
+        });
+    } catch (error) {
+        console.error(error);
+        showToast("No se ha podido mantener la pantalla activa en este dispositivo");
+        wakeLockWanted = false;
+        setWakeToggleVisual(false);
+    }
+}
+
+async function releaseWakeLock() {
+    wakeLockWanted = false;
+    if (wakeLockSentinel) {
+        try { await wakeLockSentinel.release(); } catch { /* ya liberado */ }
+        wakeLockSentinel = null;
+    }
+    setWakeToggleVisual(false);
+}
+
+function setWakeToggleVisual(active) {
+    wakeLockToggle.classList.toggle("active", active);
+    wakeLockToggle.setAttribute("aria-checked", active ? "true" : "false");
+}
+
+wakeLockToggle.addEventListener("click", async () => {
+    if (wakeLockWanted) {
+        await releaseWakeLock();
+        saveJson(WAKE_LOCK_PREF_KEY, false);
+    } else {
+        await requestWakeLock();
+        saveJson(WAKE_LOCK_PREF_KEY, true);
+    }
+});
+
+document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && wakeLockWanted && !wakeLockSentinel) {
+        await requestWakeLock();
+    }
+});
+
+/* ---------- ALMACENAMIENTO ---------- */
 
 function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -272,6 +355,10 @@ function formatDateShort(dateString) {
     return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(`${dateString}T00:00:00`));
 }
 
+function formatDateLong(dateString) {
+    return new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${dateString}T00:00:00`));
+}
+
 function getIsoWeekKey(dateString) {
     const date = new Date(`${dateString}T00:00:00`);
     const day = (date.getDay() + 6) % 7;
@@ -295,6 +382,10 @@ function showView(viewId) {
     newWorkoutButton.classList.toggle("hidden-view", viewId === "new-workout-view" || viewId === "active-workout-view");
     navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === viewId));
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (viewId !== "active-workout-view" && wakeLockWanted) {
+        releaseWakeLock();
+    }
 }
 
 function previousPerformance(name, currentWorkoutId) {
@@ -521,6 +612,7 @@ function render() {
     renderWorkouts();
     renderProgress();
     renderLibrary();
+    refreshUndoButton();
 }
 
 const emptyStateIcon = `<svg class="empty-state-icon" viewBox="0 0 24 24"><path d="M12 3v18M4 12h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/></svg>`;
@@ -580,13 +672,94 @@ duplicateWorkoutForm.addEventListener("submit", (event) => {
     renderActiveWorkout();
     closePanel(duplicateWorkoutPanel);
     showView("active-workout-view");
+    maybeAutoRequestWakeLock();
     showToast("Sesión creada a partir de la anterior", "success");
 });
 
 cancelDuplicateWorkout.addEventListener("click", () => { pendingDuplicate = null; closePanel(duplicateWorkoutPanel); });
 duplicateWorkoutPanel.addEventListener("click", (event) => { if (event.target === duplicateWorkoutPanel) { pendingDuplicate = null; closePanel(duplicateWorkoutPanel); } });
 
+/* ---------- CALENDARIO ---------- */
+
+function renderCalendar() {
+    const year = calendarViewDate.getFullYear();
+    const month = calendarViewDate.getMonth();
+
+    calendarMonthLabel.textContent = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(calendarViewDate);
+
+    const sessionsByDate = new Map();
+    workouts.forEach((workout) => {
+        if (!sessionsByDate.has(workout.date)) sessionsByDate.set(workout.date, []);
+        sessionsByDate.get(workout.date).push(workout);
+    });
+
+    const firstOfMonth = new Date(year, month, 1);
+    const startOffset = (firstOfMonth.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayString = today();
+
+    const cells = [];
+    for (let i = 0; i < startOffset; i += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
+
+    calendarGrid.innerHTML = cells.map((day) => {
+        if (!day) return `<div class="calendar-day empty"></div>`;
+        const dateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const hasSession = sessionsByDate.has(dateString);
+        const isToday = dateString === todayString;
+        const classes = ["calendar-day"];
+        if (isToday) classes.push("today");
+        if (hasSession) classes.push("has-session");
+        return `<div class="${classes.join(" ")}" ${hasSession ? `data-calendar-date="${dateString}"` : ""}>${day}${hasSession ? `<span class="calendar-dot"></span>` : ""}</div>`;
+    }).join("");
+}
+
+calendarGrid.addEventListener("click", (event) => {
+    const cell = event.target.closest("[data-calendar-date]");
+    if (!cell) return;
+    openDayDetail(cell.dataset.calendarDate);
+});
+
+calendarPrev.addEventListener("click", () => {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
+    renderCalendar();
+});
+
+calendarNext.addEventListener("click", () => {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1);
+    renderCalendar();
+});
+
+function openDayDetail(dateString) {
+    const sessionsThatDay = workouts.filter((workout) => workout.date === dateString);
+    if (!sessionsThatDay.length) return;
+
+    dayDetailDate.textContent = formatDateLong(dateString).toUpperCase();
+
+    if (sessionsThatDay.length === 1) {
+        const workout = sessionsThatDay[0];
+        dayDetailTitle.textContent = workout.type;
+        dayDetailContent.innerHTML = `
+            <div class="day-detail-meta"><span>Duración</span><strong>${workout.duration} min</strong></div>
+            ${workout.exercises.map((exercise) => `<div class="day-detail-exercise"><strong>${escapeHtml(exercise.name)}</strong><span class="muted">${exercise.sets.length} sets</span></div>`).join("")}
+        `;
+    } else {
+        dayDetailTitle.textContent = `${sessionsThatDay.length} sesiones`;
+        dayDetailContent.innerHTML = sessionsThatDay.map((workout) => `
+            <div class="day-detail-meta"><span>${escapeHtml(workout.type)}</span><strong>${workout.duration} min</strong></div>
+            ${workout.exercises.map((exercise) => `<div class="day-detail-exercise"><strong>${escapeHtml(exercise.name)}</strong><span class="muted">${exercise.sets.length} sets</span></div>`).join("")}
+        `).join("");
+    }
+
+    openPanel(dayDetailPanel);
+}
+
+closeDayDetail.addEventListener("click", () => closePanel(dayDetailPanel));
+dayDetailPanel.addEventListener("click", (event) => { if (event.target === dayDetailPanel) closePanel(dayDetailPanel); });
+
 function renderProgress() {
+    renderCalendar();
+
     const consistency = calculateConsistency();
     document.querySelector("#streak-weeks").textContent = consistency.streak;
     document.querySelector("#month-sessions").textContent = consistency.monthSessions;
@@ -855,8 +1028,15 @@ function startWorkout(event) {
     persistActiveWorkout();
     renderActiveWorkout();
     showView("active-workout-view");
+    maybeAutoRequestWakeLock();
     if (!pendingTemplate) openPanel(addExercisePanel);
     pendingTemplate = null;
+}
+
+function maybeAutoRequestWakeLock() {
+    const preferred = loadJson(WAKE_LOCK_PREF_KEY, false);
+    if (preferred) requestWakeLock();
+    else setWakeToggleVisual(false);
 }
 
 function openPanel(panel) {
@@ -878,15 +1058,16 @@ async function finishWorkout() {
     await persist();
     localStorage.removeItem(ACTIVE_KEY);
     activeWorkout = null;
+    await releaseWakeLock();
     render();
     showView("summary-view");
     showToast("Sesión guardada correctamente", "success");
 }
 
-/* ---------- COPIAS DE SEGURIDAD ---------- */
+/* ---------- COPIAS DE SEGURIDAD ROBUSTAS ---------- */
 
 function exportBackup() {
-    const backup = { version: "10", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
+    const backup = { version: "13", workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises() };
     const file = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
@@ -897,24 +1078,145 @@ function exportBackup() {
     showToast("Copia de seguridad exportada", "success");
 }
 
+function validateBackupStructure(raw) {
+    const errors = [];
+    const source = Array.isArray(raw) ? { workouts: raw } : raw;
+
+    if (!source || typeof source !== "object") {
+        return { valid: false, errors: ["El archivo no tiene un formato reconocible."] };
+    }
+
+    const rawWorkouts = source.workouts;
+    if (!Array.isArray(rawWorkouts)) {
+        errors.push("No se encontró una lista de entrenamientos válida.");
+        return { valid: false, errors };
+    }
+
+    let invalidWorkouts = 0;
+    rawWorkouts.forEach((workout) => {
+        if (!workout || typeof workout !== "object") { invalidWorkouts += 1; return; }
+        const hasDate = typeof (workout.date || workout.dia) === "string";
+        const hasExercises = Array.isArray(workout.exercises || workout.ejercicios);
+        if (!hasDate || !hasExercises) invalidWorkouts += 1;
+    });
+
+    if (invalidWorkouts === rawWorkouts.length && rawWorkouts.length > 0) {
+        errors.push("Ningún entrenamiento del archivo tiene un formato válido.");
+        return { valid: false, errors };
+    }
+
+    const favorites = Array.isArray(source.favorites) ? source.favorites : [];
+    const templates = Array.isArray(source.templates) ? source.templates : [];
+    const customExercises = Array.isArray(source.customExercises) ? source.customExercises : [];
+
+    return {
+        valid: true,
+        errors,
+        counts: {
+            sessions: rawWorkouts.length,
+            invalidSessions: invalidWorkouts,
+            favorites: favorites.length,
+            templates: templates.length,
+            customExercises: customExercises.length
+        },
+        source
+    };
+}
+
+function saveUndoSnapshot() {
+    const snapshot = { workouts, favorites: getFavorites(), templates: getTemplates(), customExercises: getCustomExercises(), savedAt: new Date().toISOString() };
+    saveJson(UNDO_SNAPSHOT_KEY, snapshot);
+}
+
+function refreshUndoButton() {
+    const snapshot = loadJson(UNDO_SNAPSHOT_KEY, null);
+    undoImportButton.classList.toggle("hidden-panel", !snapshot);
+}
+
 function importBackup(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async () => {
+    reader.onload = () => {
+        let parsed;
         try {
-            const imported = JSON.parse(reader.result);
-            workouts = normaliseWorkouts(Array.isArray(imported) ? imported : imported.workouts);
-            saveJson(FAVORITES_KEY, Array.isArray(imported.favorites) ? imported.favorites : []);
-            saveJson(TEMPLATES_KEY, Array.isArray(imported.templates) ? imported.templates : []);
-            saveJson(CUSTOM_EXERCISES_KEY, Array.isArray(imported.customExercises) ? imported.customExercises : []);
-            await persist();
-            render();
-            showToast("Copia importada correctamente", "success");
-        } catch { window.alert("No se ha podido importar el archivo"); }
+            parsed = JSON.parse(reader.result);
+        } catch {
+            window.alert("El archivo no es un JSON válido. No se ha modificado ningún dato.");
+            importInput.value = "";
+            return;
+        }
+
+        const validation = validateBackupStructure(parsed);
+        if (!validation.valid) {
+            window.alert(`No se puede importar este archivo:\n\n${validation.errors.join("\n")}\n\nTus datos actuales no se han modificado.`);
+            importInput.value = "";
+            return;
+        }
+
+        pendingImport = validation.source;
+        importSummary.innerHTML = `
+            <div class="import-summary-row"><span>Sesiones en el archivo</span><strong>${validation.counts.sessions}</strong></div>
+            <div class="import-summary-row"><span>Favoritos en el archivo</span><strong>${validation.counts.favorites}</strong></div>
+            <div class="import-summary-row"><span>Plantillas en el archivo</span><strong>${validation.counts.templates}</strong></div>
+            <div class="import-summary-row"><span>Ejercicios personalizados</span><strong>${validation.counts.customExercises}</strong></div>
+            <div class="import-summary-row"><span>Tus sesiones actuales</span><strong>${workouts.length}</strong></div>
+            ${validation.counts.invalidSessions > 0 ? `<div class="import-warning">${validation.counts.invalidSessions} sesión(es) del archivo tienen formato incompleto y se omitirán.</div>` : ""}
+        `;
+        openPanel(importConfirmPanel);
     };
     reader.readAsText(file);
 }
+
+confirmImport.addEventListener("click", async () => {
+    if (!pendingImport) return;
+
+    saveUndoSnapshot();
+
+    workouts = normaliseWorkouts(pendingImport.workouts);
+    saveJson(FAVORITES_KEY, Array.isArray(pendingImport.favorites) ? pendingImport.favorites : []);
+    saveJson(TEMPLATES_KEY, Array.isArray(pendingImport.templates) ? pendingImport.templates : []);
+    saveJson(CUSTOM_EXERCISES_KEY, Array.isArray(pendingImport.customExercises) ? pendingImport.customExercises : []);
+    await persist();
+
+    pendingImport = null;
+    importInput.value = "";
+    closePanel(importConfirmPanel);
+    render();
+    showToast("Copia importada correctamente", "success");
+});
+
+cancelImport.addEventListener("click", () => {
+    pendingImport = null;
+    importInput.value = "";
+    closePanel(importConfirmPanel);
+});
+
+importConfirmPanel.addEventListener("click", (event) => {
+    if (event.target === importConfirmPanel) {
+        pendingImport = null;
+        importInput.value = "";
+        closePanel(importConfirmPanel);
+    }
+});
+
+undoImportButton.addEventListener("click", async () => {
+    const snapshot = loadJson(UNDO_SNAPSHOT_KEY, null);
+    if (!snapshot) return;
+
+    const confirmUndo = window.confirm("Esto restaurará tus datos a como estaban justo antes de la última importación. ¿Continuar?");
+    if (!confirmUndo) return;
+
+    workouts = normaliseWorkouts(snapshot.workouts || []);
+    saveJson(FAVORITES_KEY, snapshot.favorites || []);
+    saveJson(TEMPLATES_KEY, snapshot.templates || []);
+    saveJson(CUSTOM_EXERCISES_KEY, snapshot.customExercises || []);
+    await persist();
+
+    localStorage.removeItem(UNDO_SNAPSHOT_KEY);
+    render();
+    showToast("Se han restaurado tus datos anteriores", "success");
+});
 
 /* ---------- LISTENERS FIJOS ---------- */
 
@@ -964,7 +1266,9 @@ async function initialise() {
     try {
         await initialiseStorage();
         activeWorkout = loadActiveWorkout();
-        if (activeWorkout) renderActiveWorkout();
+        if (activeWorkout) {
+            renderActiveWorkout();
+        }
         prepareWorkoutForm();
         render();
         connectionStatus.textContent = navigator.onLine ? "Online" : "Offline";
@@ -979,5 +1283,6 @@ async function initialise() {
 
 window.addEventListener("online", () => { connectionStatus.textContent = "Online"; });
 window.addEventListener("offline", () => { connectionStatus.textContent = "Offline"; });
+window.addEventListener("beforeunload", () => { if (wakeLockWanted) releaseWakeLock(); });
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js"));
 initialise();
